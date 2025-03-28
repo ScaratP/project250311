@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,8 +25,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.project250311.Schedule.GetSchedule.GetScheduleActivity
 import com.example.project250311.Schedule.NoSchool.GetLeaveDataActivity
-//import com.example.project250311.Schedule.Note.NoteActivity
-//import com.example.project250311.Schedule.Note.NoteListActivity
+import com.example.project250311.Schedule.Note.NoteActivity
+import com.example.project250311.Schedule.Note.NoteListActivity
 import com.example.project250311.Schedule.Notice.NoticeActivity
 import com.example.project250311.ui.theme.Project250311Theme
 
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen123() {
     val context = LocalContext.current
 
     Project250311Theme {
@@ -95,22 +96,22 @@ fun MainScreen() {
                     },
                     modifier = Modifier.weight(1f)
                 )
-//                MenuButton(
-//                    text = "Notes",
-//                    icon = Icons.Default.Note,
-//                    onClick = {
-//                        context.startActivity(Intent(context, NoteListActivity::class.java))
-//                    },
-//                    modifier = Modifier.weight(1f)
-//                )
-//                MenuButton(
-//                    text = "More",
-//                    icon = Icons.Default.MoreHoriz,
-//                    onClick = {
-//                        context.startActivity(Intent(context, NoteActivity::class.java))
-//                    },
-//                    modifier = Modifier.weight(1f)
-//                )
+                MenuButton(
+                    text = "Notes",
+                    icon = Icons.Default.Note,
+                    onClick = {
+                        context.startActivity(Intent(context, NoteListActivity::class.java))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                MenuButton(
+                    text = "More",
+                    icon = Icons.Default.MoreHoriz,
+                    onClick = {
+                        context.startActivity(Intent(context, NoteActivity::class.java))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
@@ -152,6 +153,88 @@ fun MenuButton(
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+@Composable
+fun MainScreen() {
+    val context = LocalContext.current
+    var selectedOption by remember { mutableStateOf("Select") } // 預設顯示選擇的選項
+    val options = listOf("Schedule", "Leave", "Notice", "Notes")
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 顯示下拉選單
+        DropDownMenuButton(
+            text = "Go to", // 這裡是顯示在下拉選單旁邊的提示文字
+            options = options,
+            selectedOption = selectedOption,
+            onOptionSelected = { option ->
+                when (option) {
+                    "Schedule" -> context.startActivity(Intent(context, GetScheduleActivity::class.java))
+                    "Leave" -> context.startActivity(Intent(context, GetLeaveDataActivity::class.java))
+                    "Notice" -> context.startActivity(Intent(context, NoticeActivity::class.java))
+                    "Notes" -> context.startActivity(Intent(context, NoteActivity::class.java))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun DropDownMenuButton(
+    text: String,  // 這個參數需要提供
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    // DropdownMenu 使用的是 Material3 的穩定 API
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .wrapContentSize(Alignment.TopStart)
+    ) {
+        // 顯示當前選擇的選項
+        TextField(
+            value = selectedOption,
+            onValueChange = {},
+            label = { Text(text) },
+            readOnly = true,
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Default.MoreHoriz,
+                    contentDescription = "下拉選單"
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = { expanded = !expanded })
+        )
+
+        // 顯示下拉選單
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onOptionSelected(option)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
