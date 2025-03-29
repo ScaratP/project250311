@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import com.example.project250311.Schedule.GetSchedule.GetScheduleActivity
 import com.example.project250311.Schedule.NoSchool.GetLeaveDataActivity
 import com.example.project250311.Schedule.NoSchool.LeaveActivity
-//import com.example.project250311.Schedule.Note.NoteActivity
-//import com.example.project250311.Schedule.Note.NoteListActivity
+import com.example.project250311.Schedule.Note.NoteActivity
+import com.example.project250311.Schedule.Note.NoteListActivity
 import com.example.project250311.Schedule.Notice.NoticeActivity
 import com.example.project250311.ui.theme.Project250311Theme
 
@@ -96,22 +96,22 @@ fun MainScreen() {
                     },
                     modifier = Modifier.weight(1f)
                 )
-//                MenuButton(
-//                    text = "Notes",
-//                    icon = Icons.Default.Note,
-//                    onClick = {
-//                        context.startActivity(Intent(context, NoteListActivity::class.java))
-//                    },
-//                    modifier = Modifier.weight(1f)
-//                )
-//                MenuButton(
-//                    text = "More",
-//                    icon = Icons.Default.MoreHoriz,
-//                    onClick = {
-//                        context.startActivity(Intent(context, NoteActivity::class.java))
-//                    },
-//                    modifier = Modifier.weight(1f)
-//                )
+                MenuButton(
+                    text = "Notes",
+                    icon = Icons.Default.Note,
+                    onClick = {
+                        context.startActivity(Intent(context, NoteListActivity::class.java))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                MenuButton(
+                    text = "More",
+                    icon = Icons.Default.MoreHoriz,
+                    onClick = {
+                        context.startActivity(Intent(context, NoteActivity::class.java))
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
