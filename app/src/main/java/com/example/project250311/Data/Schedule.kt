@@ -17,12 +17,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import com.example.project250311.Schedule.GetSchedule.getCourseDates
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @Entity(tableName = "course_table")
 data class Schedule(
@@ -30,9 +33,10 @@ data class Schedule(
     val courseName: String,
     val teacherName: String,
     val location: String,
-    val weekDay: String,
+    val weekDay: String,// 星期幾，例如 "Monday"
     val startTime: LocalTime,
-    val endTime: LocalTime
+    val endTime: LocalTime,
+    val courseDates:List<LocalDate>// 每門課程的日期清單
 )
 
 @Dao
@@ -51,6 +55,18 @@ interface CourseDao {
 }
 
 class Converters {
+    private val formatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+    @TypeConverter
+    fun fromLocalDateList(dates: List<LocalDate>?): String? {
+        return dates?.joinToString(",") { it.format(formatter) }
+    }
+
+    @TypeConverter
+    fun toLocalDateList(data: String?): List<LocalDate>? {
+        return data?.split(",")?.map { LocalDate.parse(it, formatter) }
+    }
+
     @TypeConverter
     fun fromLocalTime(time: LocalTime?): String? {
         return time?.toString() // 例如 "09:10"

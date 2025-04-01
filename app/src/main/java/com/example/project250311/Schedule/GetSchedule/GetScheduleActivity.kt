@@ -61,10 +61,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.jsoup.Jsoup
-import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
+
+
 
 class GetScheduleActivity : ComponentActivity() {
     private val viewModel: CourseViewModel by viewModels {
@@ -135,7 +139,8 @@ suspend fun fetchWebData(url: String, cookies: String?): List<Schedule> {
                             location = parsedData["場地"] ?: "其它",
                             weekDay = weekDay,
                             startTime = startTime,
-                            endTime = endTime
+                            endTime = endTime,
+                            courseDates = getCourseDates(weekDay)
                         )
                         tempDataList.add(courseSchedule)
                     }
@@ -166,7 +171,8 @@ suspend fun fetchWebData(url: String, cookies: String?): List<Schedule> {
                                 location = courses.first().location,
                                 weekDay = key.second,
                                 startTime = currentStartTime.plusMinutes(10),
-                                endTime = currentEndTime!!
+                                endTime = currentEndTime!!,
+                                courseDates = getCourseDates(key.second) // 傳遞計算出的課程日期
                             )
                         )
                         currentStartTime = course.startTime
@@ -183,7 +189,8 @@ suspend fun fetchWebData(url: String, cookies: String?): List<Schedule> {
                             location = courses.first().location,
                             weekDay = key.second,
                             startTime = currentStartTime.plusMinutes(10),
-                            endTime = currentEndTime
+                            endTime = currentEndTime,
+                            courseDates = getCourseDates(key.second) // 傳遞計算出的課程日期
                         )
                     )
                 }
@@ -658,9 +665,10 @@ fun CourseItem(course: Schedule) {
             onCheckedChange = { isEnabled ->
                 notificationStates[course.id] = isEnabled
                 if (isEnabled) {
-                    val alarmTime = course.startTime.minusMinutes(10) // 提前 10 分鐘通知
-                    setNoticationAlarm(context, alarmTime, course)
-
+                    // 對每個上課日期設定通知
+                    course.courseDates.forEach { date ->
+                        setNoticationAlarm(context, course, date)
+                    }
                 } else {
                     cancelNotificatuon(context, course)
                 }
@@ -670,19 +678,30 @@ fun CourseItem(course: Schedule) {
 }
 
 
-fun setNoticationAlarm(context: Context, alarmTime: LocalTime, course: Schedule) {
-    // 1. 將傳入的 LocalTime（僅包含時間）轉換成 Calendar 時間
-    //    這裡假設使用今天的日期
+fun setNoticationAlarm(context: Context, course: Schedule, courseDate: LocalDate) {
+    val alarmTime = course.startTime.minusMinutes(10) // 提前 10 分鐘通知
+
+    // 設定鬧鐘時間（確保是課程當天）
     val alarmCalendar = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.YEAR, courseDate.year)
+        set(java.util.Calendar.MONTH, courseDate.monthValue - 1) // Calendar 的 month 是 0-based
+        set(java.util.Calendar.DAY_OF_MONTH, courseDate.dayOfMonth - 1)
         set(java.util.Calendar.HOUR_OF_DAY, alarmTime.hour)
         set(java.util.Calendar.MINUTE, alarmTime.minute)
         set(java.util.Calendar.SECOND, 0)
         set(java.util.Calendar.MILLISECOND, 0)
     }
 
-    // 2. 建立一個 Intent，此 Intent 將用於傳送資料給廣播接收器 (NotificationReceiver)
+    val now = java.util.Calendar.getInstance()
+    if (alarmCalendar.timeInMillis <= now.timeInMillis) {
+        // **如果時間已經過去，不應該推遲一週，而是直接跳過**
+        return
+    }
+
+    // 讓 PendingIntent 唯一，防止不同天的相同時間課程被覆蓋
+    val requestCode = "${course.id}_${courseDate}".hashCode()
+
     val alarmIntent = Intent(context, NotificationReceiver::class.java).apply {
-        // 傳遞課程資訊到接收器，這些資訊將用於建立通知
         putExtra("course_id", course.id)
         putExtra("course_name", course.courseName)
         putExtra("teacher_name", course.teacherName)
@@ -691,20 +710,22 @@ fun setNoticationAlarm(context: Context, alarmTime: LocalTime, course: Schedule)
         putExtra("end_time", course.endTime.toString())
     }
 
-    // 3. 使用 PendingIntent 包裝這個 Intent
-    //    這裡利用 course.id.hashCode() 作為 requestCode，確保不同課程擁有唯一 PendingIntent
     val pendingIntent = PendingIntent.getBroadcast(
         context,
-        course.id.hashCode(),
+        requestCode, // 確保不同日期的課程不會覆蓋
         alarmIntent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    // 4. 取得 AlarmManager 系統服務，並呼叫 setExact() 設定一個精確的鬧鐘
-    //    AlarmManager.RTC_WAKEUP 表示當鬧鐘觸發時會喚醒裝置（如果需要）
     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-    alarmManager.setExact(android.app.AlarmManager.RTC_WAKEUP, alarmCalendar.timeInMillis, pendingIntent)
+    alarmManager.setExactAndAllowWhileIdle(
+        android.app.AlarmManager.RTC_WAKEUP,
+        alarmCalendar.timeInMillis,
+        pendingIntent
+    )
 }
+
+
 
 private fun createNotificationChannel(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { //判斷版本是否在API26以上
@@ -746,6 +767,38 @@ fun cancelNotificatuon(context: Context,course: Schedule){
     val notificationManager = NotificationManagerCompat.from(context)
     notificationManager.cancel(notificationId)
 }
+
+
+fun getCourseDates(weekDay: String): List<java.time.LocalDate> {
+    val now = java.time.LocalDate.now() // 取得今天的日期
+    // 以最近一個星期一作為起始日期
+    val semesterStart = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    // 假設學期為 18 週
+    val semesterEnd = semesterStart.plusWeeks(18)
+
+    // 找到對應的 DayOfWeek
+    val targetDayOfWeek = when (weekDay) {
+        "星期一" -> DayOfWeek.MONDAY
+        "星期二" -> DayOfWeek.TUESDAY
+        "星期三" -> DayOfWeek.WEDNESDAY
+        "星期四" -> DayOfWeek.THURSDAY
+        "星期五" -> DayOfWeek.FRIDAY
+        "星期六" -> DayOfWeek.SATURDAY
+        "星期日" -> DayOfWeek.SUNDAY
+        else -> return emptyList()
+    }
+
+    val dates = mutableListOf<java.time.LocalDate>()
+    var date = semesterStart.with(TemporalAdjusters.nextOrSame(targetDayOfWeek)) // 找到最近的該星期幾
+
+    while (!date.isAfter(semesterEnd)) {
+        dates.add(date)
+        date = date.plusWeeks(1) // 每週同一天
+    }
+    return dates
+}
+
+
 
 
 /*fun sendNotification(context: Context, course: Schedule) {
