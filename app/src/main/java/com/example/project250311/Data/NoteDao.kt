@@ -18,4 +18,8 @@ interface NoteDao {
 
     @Query("SELECT * FROM notes WHERE content LIKE :query ORDER BY timestamp DESC")
     suspend fun searchNotes(query: String): List<Note>
+
+    // 新增按日期範圍查詢的方法
+    @Query("SELECT * FROM notes WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
+    suspend fun getNotesByDate(start: Long, end: Long): List<Note>
 }
