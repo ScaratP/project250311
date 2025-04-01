@@ -3,6 +3,7 @@ package com.example.project250311.Schedule.GetSchedule
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlarmManager
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -41,9 +42,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.getSystemService
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.project250311.Data.AppDatabase
@@ -77,6 +80,8 @@ class GetScheduleActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        createNotificationChannel(this) //建立通知頻道
+        requestNotificationPermission(this)
         setContent {
             ScheduleScreen(viewModel)
         }
@@ -534,6 +539,14 @@ fun CourseDetailCard(
     viewModel: CourseViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+
+    LaunchedEffect(Unit) {
+        createNotificationChannel(context)
+        activity?.let { requestNotificationPermission(it) }
+    }
+
     if (courses.isEmpty()) return
 
     var showEditDialog by remember { mutableStateOf(false) }
@@ -691,6 +704,40 @@ fun setNoticationAlarm(context: Context, alarmTime: LocalTime, course: Schedule)
     //    AlarmManager.RTC_WAKEUP 表示當鬧鐘觸發時會喚醒裝置（如果需要）
     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
     alarmManager.setExact(android.app.AlarmManager.RTC_WAKEUP, alarmCalendar.timeInMillis, pendingIntent)
+}
+
+private fun createNotificationChannel(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { //判斷版本是否在API26以上
+        val channelId = "notify_id" //通道的唯一辨識符號
+        val channelName = "通知通道" //顯示給使用者的通知名稱
+        val channelDescription = "這是APP的通知通道" //用來描述通道的用途
+        val importance = NotificationManager.IMPORTANCE_HIGH //通知優先順序
+        val channel = NotificationChannel(channelId, channelName, importance).apply { //創建新的通知通道
+            description = channelDescription //設定通知描述
+        }
+        //取得NotificationManager並建立通知通道
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager //取得系統通知管理氣
+        notificationManager.createNotificationChannel(channel) //註冊通知通道
+    }
+}
+
+fun requestNotificationPermission(activity: Activity){
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (ContextCompat.checkSelfPermission(
+                activity,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // 如果沒有權限，請求權限
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                1001
+            )
+            return
+        }
+    }
+
 }
 
 fun cancelNotificatuon(context: Context,course: Schedule){

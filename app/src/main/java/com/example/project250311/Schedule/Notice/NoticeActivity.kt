@@ -189,43 +189,4 @@ fun NotificationButton(){
         }
     }
 
-    fun setNoticationAlarm(context: Context, alarmTime: LocalTime, course: Schedule) {
-        // 若為 Android 12 (API 31) 以上，檢查是否可以設定精確鬧鐘
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (!alarmManager.canScheduleExactAlarms()) {
-                // 可在此提示使用者或返回
-                return
-            }
-        }
-
-        // 將 LocalTime（僅包含時間）轉換為 Calendar 時間（假設使用當天日期）
-        val alarmCalendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, alarmTime.hour)
-            set(Calendar.MINUTE, alarmTime.minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-
-        // 建立 Intent 傳遞課程資訊到 NotificationReceiver
-        val alarmIntent = Intent(context, NotificationReceiver::class.java).apply {
-            putExtra("course_id", course.id)
-            putExtra("course_name", course.courseName)
-            putExtra("teacher_name", course.teacherName)
-            putExtra("location", course.location)
-            putExtra("start_time", course.startTime.toString())
-            putExtra("end_time", course.endTime.toString())
-        }
-
-        // 使用 course.id.hashCode() 來保證唯一的 PendingIntent
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            course.id.hashCode(),
-            alarmIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // 使用 AlarmManager 設定精確鬧鐘
-        alarmManager.setExact(AlarmManager.RTC_WAKEUP, alarmCalendar.timeInMillis, pendingIntent)
-    }
 }
