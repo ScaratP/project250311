@@ -679,13 +679,20 @@ fun CourseItem(course: Schedule) {
 
 
 fun setNoticationAlarm(context: Context, course: Schedule, courseDate: LocalDate) {
-    val alarmTime = course.startTime.minusMinutes(10) // 提前 10 分鐘通知
+    // 僅對今天的課程進行提醒排程
+    if (courseDate != LocalDate.now()) {
+        Log.d("setNoticationAlarm", "課程日期 $courseDate 非今天，跳過排程")
+        return
+    }
 
-    // 設定鬧鐘時間（確保是課程當天）
+    // 提前 10 分鐘提醒
+    val alarmTime = course.startTime.minusMinutes(10)
+
+    // 組合課程日期與提醒時間，產生完整的鬧鐘 Calendar
     val alarmCalendar = java.util.Calendar.getInstance().apply {
         set(java.util.Calendar.YEAR, courseDate.year)
-        set(java.util.Calendar.MONTH, courseDate.monthValue - 1) // Calendar 的 month 是 0-based
-        set(java.util.Calendar.DAY_OF_MONTH, courseDate.dayOfMonth - 1)
+        set(java.util.Calendar.MONTH, courseDate.monthValue - 1) // Calendar 的月份從 0 開始
+        set(java.util.Calendar.DAY_OF_MONTH, courseDate.dayOfMonth)
         set(java.util.Calendar.HOUR_OF_DAY, alarmTime.hour)
         set(java.util.Calendar.MINUTE, alarmTime.minute)
         set(java.util.Calendar.SECOND, 0)
@@ -694,11 +701,12 @@ fun setNoticationAlarm(context: Context, course: Schedule, courseDate: LocalDate
 
     val now = java.util.Calendar.getInstance()
     if (alarmCalendar.timeInMillis <= now.timeInMillis) {
-        // **如果時間已經過去，不應該推遲一週，而是直接跳過**
+        // 如果提醒時間已經過去（例如使用者進入 App 時已錯過），則不設定通知
+        Log.d("setNoticationAlarm", "提醒時間 ${alarmCalendar.time} 已過，跳過設定")
         return
     }
 
-    // 讓 PendingIntent 唯一，防止不同天的相同時間課程被覆蓋
+    // 使用 course.id 與 courseDate 產生唯一 requestCode，避免多堂課程間互相覆蓋
     val requestCode = "${course.id}_${courseDate}".hashCode()
 
     val alarmIntent = Intent(context, NotificationReceiver::class.java).apply {
@@ -712,7 +720,7 @@ fun setNoticationAlarm(context: Context, course: Schedule, courseDate: LocalDate
 
     val pendingIntent = PendingIntent.getBroadcast(
         context,
-        requestCode, // 確保不同日期的課程不會覆蓋
+        requestCode,
         alarmIntent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
@@ -723,7 +731,10 @@ fun setNoticationAlarm(context: Context, course: Schedule, courseDate: LocalDate
         alarmCalendar.timeInMillis,
         pendingIntent
     )
+
+    Log.d("setNoticationAlarm", "已排程提醒，時間：${alarmCalendar.time}")
 }
+
 
 
 
