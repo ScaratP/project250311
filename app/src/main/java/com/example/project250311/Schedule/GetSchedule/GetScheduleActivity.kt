@@ -17,6 +17,7 @@ import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -67,7 +68,7 @@ import java.util.Calendar
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
-
+import kotlin.math.absoluteValue
 
 
 class GetScheduleActivity : ComponentActivity() {
@@ -666,9 +667,16 @@ fun CourseItem(course: Schedule) {
                 notificationStates[course.id] = isEnabled
                 if (isEnabled) {
                     // 對每個上課日期設定通知
-                    course.courseDates.forEach { date ->
+                    val tp = course.courseDates.joinToString(separator = "/") { date ->
                         setNoticationAlarm(context, course, date)
+                        date.toString()+course.startTime.toString() // 把日期轉成字串
                     }
+
+                    Toast.makeText(
+                        context,
+                        "已設定通知：${course.weekDay} ${course.startTime} - ${course.endTime}\n$tp",
+                        Toast.LENGTH_LONG
+                    ).show()
                 } else {
                     cancelNotificatuon(context, course)
                 }
@@ -677,22 +685,84 @@ fun CourseItem(course: Schedule) {
     }
 }
 
-
+//
+//fun setNoticationAlarm(context: Context, course: Schedule, courseDate: LocalDate) {
+//    // 僅對今天的課程進行提醒排程
+//    if (courseDate != LocalDate.now()) {
+//        Log.d("setNoticationAlarm", "課程日期 $courseDate 非今天，跳過排程")
+//        return
+//    }
+//
+//    // 提前 10 分鐘提醒
+//    val alarmTime = course.startTime.minusMinutes(10)
+//
+//    // 組合課程日期與提醒時間，產生完整的鬧鐘 Calendar
+//    val alarmCalendar = java.util.Calendar.getInstance().apply {
+//        set(java.util.Calendar.YEAR, courseDate.year)
+//        set(java.util.Calendar.MONTH, courseDate.monthValue - 1) // Calendar 的月份從 0 開始
+//        set(java.util.Calendar.DAY_OF_MONTH, courseDate.dayOfMonth)
+//        set(java.util.Calendar.HOUR_OF_DAY, alarmTime.hour)
+//        set(java.util.Calendar.MINUTE, alarmTime.minute)
+//        set(java.util.Calendar.SECOND, 0)
+//        set(java.util.Calendar.MILLISECOND, 0)
+//    }
+//
+//    val now = java.util.Calendar.getInstance()
+//    if (alarmCalendar.timeInMillis <= now.timeInMillis) {
+//        // 如果提醒時間已經過去（例如使用者進入 App 時已錯過），則不設定通知
+//        Log.d("setNoticationAlarm", "提醒時間 ${alarmCalendar.time} 已過，跳過設定")
+//        return
+//    }
+//
+//    // 使用 course.id 與 courseDate 產生唯一 requestCode，避免多堂課程間互相覆蓋
+//    val requestCode = "${course.id}_${courseDate}".hashCode()
+//
+//    val alarmIntent = Intent(context, NotificationReceiver::class.java).apply {
+//        putExtra("course_id", course.id)
+//        putExtra("course_name", course.courseName)
+//        putExtra("teacher_name", course.teacherName)
+//        putExtra("location", course.location)
+//        putExtra("start_time", course.startTime.toString())
+//        putExtra("end_time", course.endTime.toString())
+//    }
+//
+//    val pendingIntent = PendingIntent.getBroadcast(
+//        context,
+//        requestCode,
+//        alarmIntent,
+//        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+//    )
+//
+//    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+//    alarmManager.setExactAndAllowWhileIdle(
+//        android.app.AlarmManager.RTC_WAKEUP,
+//        alarmCalendar.timeInMillis,
+//        pendingIntent
+//    )
+//
+//    Log.d("setNoticationAlarm", "已排程提醒，時間：${alarmCalendar.time}")
+//}
 fun setNoticationAlarm(context: Context, course: Schedule, courseDate: LocalDate) {
-    // 僅對今天的課程進行提醒排程
-    if (courseDate != LocalDate.now()) {
-        Log.d("setNoticationAlarm", "課程日期 $courseDate 非今天，跳過排程")
+    // 允許未來的課程，但排除過去的課程
+    if (courseDate.isBefore(LocalDate.now())) {
+        Log.d("setNoticationAlarm", "課程日期 $courseDate 已過，跳過排程")
         return
     }
 
-    // 提前 10 分鐘提醒
+    // 提前 10 分鐘提醒，但確保不會是過去時間
     val alarmTime = course.startTime.minusMinutes(10)
 
-    // 組合課程日期與提醒時間，產生完整的鬧鐘 Calendar
+    // 如果提醒時間超過 23:59，代表應該屬於前一天
+    val adjustedCourseDate = if (alarmTime.hour == 23 && alarmTime.minute >= 50) {
+        courseDate.minusDays(1)
+    } else {
+        courseDate
+    }
+    // 設置提醒時間
     val alarmCalendar = java.util.Calendar.getInstance().apply {
-        set(java.util.Calendar.YEAR, courseDate.year)
-        set(java.util.Calendar.MONTH, courseDate.monthValue - 1) // Calendar 的月份從 0 開始
-        set(java.util.Calendar.DAY_OF_MONTH, courseDate.dayOfMonth)
+        set(java.util.Calendar.YEAR, adjustedCourseDate.year)
+        set(java.util.Calendar.MONTH, adjustedCourseDate.monthValue - 1) // Calendar 的月份從 0 開始
+        set(java.util.Calendar.DAY_OF_MONTH, adjustedCourseDate.dayOfMonth)
         set(java.util.Calendar.HOUR_OF_DAY, alarmTime.hour)
         set(java.util.Calendar.MINUTE, alarmTime.minute)
         set(java.util.Calendar.SECOND, 0)
@@ -701,19 +771,18 @@ fun setNoticationAlarm(context: Context, course: Schedule, courseDate: LocalDate
 
     val now = java.util.Calendar.getInstance()
     if (alarmCalendar.timeInMillis <= now.timeInMillis) {
-        // 如果提醒時間已經過去（例如使用者進入 App 時已錯過），則不設定通知
         Log.d("setNoticationAlarm", "提醒時間 ${alarmCalendar.time} 已過，跳過設定")
         return
     }
 
-    // 使用 course.id 與 courseDate 產生唯一 requestCode，避免多堂課程間互相覆蓋
-    val requestCode = "${course.id}_${courseDate}".hashCode()
+    // 確保 requestCode 唯一
+    val requestCode = (course.id.hashCode() + courseDate.toString().hashCode() + alarmTime.toString().hashCode()).absoluteValue
 
     val alarmIntent = Intent(context, NotificationReceiver::class.java).apply {
         putExtra("course_id", course.id)
         putExtra("course_name", course.courseName)
         putExtra("teacher_name", course.teacherName)
-        putExtra("location", course.location)
+        putExtra("location", course.location.toString()+courseDate.toString())
         putExtra("start_time", course.startTime.toString())
         putExtra("end_time", course.endTime.toString())
     }

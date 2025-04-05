@@ -1,7 +1,9 @@
 package com.example.project250311.Schedule.Notice
 
+import android.app.DatePickerDialog
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -35,6 +37,8 @@ import com.example.project250311.ui.theme.Project250311Theme
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import androidx.compose.runtime.*
+import java.util.Calendar
 
 class NoticeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,6 +94,9 @@ class NoticeActivity : ComponentActivity() {
 @Composable
 fun NotificationButton() {
     val context = LocalContext.current
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var selectedTime by remember { mutableStateOf(LocalTime.now()) }
+    var reminders by remember { mutableStateOf(listOf<String>()) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -104,9 +111,9 @@ fun NotificationButton() {
                 onClick = {
                     val testSchedule = Schedule(
                         id = "test1",
-                        courseName = "測試課程",
-                        teacherName = "測試老師",
-                        location = "測試教室",
+                        courseName = "立即測試課程",
+                        teacherName = "立即測試老師",
+                        location = "立即測試教室",
                         weekDay = "今天",
                         startTime = LocalTime.now().plusMinutes(1),
                         endTime = LocalTime.now().plusMinutes(2),
@@ -151,6 +158,45 @@ fun NotificationButton() {
             ) {
                 Text("測試未來鬧鐘通知")
             }
+
+            Button(onClick = {
+                val calendar = Calendar.getInstance()
+                DatePickerDialog(context, { _, year, month, dayOfMonth ->
+                    selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
+                }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+            }) {
+                Text("選擇日期")
+            }
+            Text(text = "已選日期: $selectedDate", modifier = Modifier.padding(start = 8.dp))
+
+            Button(onClick = {
+                val calendar = Calendar.getInstance()
+                TimePickerDialog(context, { _, hour, minute ->
+                    selectedTime = LocalTime.of(hour, minute)
+                }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show()
+            }) {
+                Text("選擇時間")
+            }
+            Text(text = "已選時間: $selectedTime", modifier = Modifier.padding(start = 8.dp))
+
+            Button(onClick = {
+                val testSchedule = Schedule(
+                    id = "custom",
+                    courseName = "這是自訂的!",
+                    teacherName = "我選的日期是$selectedDate",
+                    location = "我選的時間是$selectedTime",
+                    weekDay = "自訂",
+                    startTime = selectedTime,
+                    endTime = selectedTime.plusMinutes(1),
+                    courseDates = listOf(selectedDate)
+                )
+                setNoticationAlarm(context, testSchedule, selectedDate)
+                reminders = reminders + "$selectedDate $selectedTime"
+            }) {
+                Text("設定提醒")
+            }
+            Text("目前提醒: ${reminders.joinToString(", ")}", modifier = Modifier.padding(top = 16.dp))
+
         }
     }
 }
